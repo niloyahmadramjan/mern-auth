@@ -1,42 +1,34 @@
 import express from "express";
-const app = express();
 import dotenv from "dotenv";
-const PORT = process.env.PORT || 5000;
-import connnectDb from "./config/db.js";
+import connectDb from "./config/db.js";
 import { createClient } from "redis";
-dotenv.config();
-await connnectDb();
+import userRoutes from "./routes/user.routes.js";
 
-// Redis connection
+dotenv.config();
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// MongoDB connect
+connectDb();
+
+// Redis connect
 const redisUrl = process.env.REDIS_URL;
 if (!redisUrl) {
   console.log("missing redis url");
   process.exit(1);
 }
 
-export const redisClient = createClient({
-  url: redisUrl,
-});
+export const redisClient = createClient({ url: redisUrl });
+await redisClient.connect();
+console.log("connected to redis");
 
-redisClient
-  .connect()
-  .then(() => console.log("connected to redis"))
-  .catch(console.error);
-
-// middlewares
+// Middlewares
 app.use(express.json());
 
-// importing routes
-import userRoutes from "./routes/user.routes.js";
-
-// using routes
-
+// Routes
 app.use("/api/v1", userRoutes);
 
-app.use("/", (req, res) => {
-  res.send("server is running...");
-});
+app.use("/", (req, res) => res.send("server is running..."));
 
-app.listen(PORT, () => {
-  console.log(`server is running on http://localhost:${PORT}`);
-});
+// Server listen
+app.listen(PORT, () => console.log(`server running on http://localhost:${PORT}`));

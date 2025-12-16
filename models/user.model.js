@@ -1,19 +1,20 @@
 import mongoose from "mongoose";
+import { required } from "zod/mini";
 
 const userSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      require: true,
+      required: true,
     },
     email: {
       type: String,
-      require: true,
+      required: true,
       unique: true,
     },
     password: {
       type: String,
-      require: true,
+      required: true,
     },
     role: {
       type: String,
@@ -23,4 +24,5 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export default User = mongoose.model("User", userSchema);
+const User = mongoose.model("User",userSchema);
+export default User;

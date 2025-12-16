@@ -2,15 +2,15 @@ import { createTransport } from "nodemailer";
 
 const sendMail = async ({ email, subject, html }) => {
   const transport = createTransport({
-    host: "smt.gmail.com",
+    host: "smtp.gmail.com",
     port: 465,
     auth: {
-      user: "sldfjsd",
-      pass: "dsjflsd",
+      user: process.env.SMTP_EMAIL,
+      pass: process.env.SMTP_PASS,
     },
   });
   await transport.sendMail({
-    from: "sfdsfd",
+    from: "nexthubpro",
     to: email,
     subject,
     html,
