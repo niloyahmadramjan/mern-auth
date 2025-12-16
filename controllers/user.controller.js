@@ -161,22 +161,18 @@ export const loginUser = tryCatch(async (req, res) => {
 
   const user = await User.findOne({ email });
   if (!user) {
-    return res
-      .status(400)
-      .json({
-        message: "Invalid credentials",
-        errorCode: "INVALID_CREDENTIALS",
-      });
+    return res.status(400).json({
+      message: "Invalid credentials",
+      errorCode: "INVALID_CREDENTIALS",
+    });
   }
   const comparePwd = await bcrypt.compare(password, user.password);
 
   if (!comparePwd) {
-    return res
-      .status(400)
-      .json({
-        message: "Invalid credentials",
-        errorCode: "INVALID_CREDENTIALS",
-      });
+    return res.status(400).json({
+      message: "Invalid credentials",
+      errorCode: "INVALID_CREDENTIALS",
+    });
   }
 
   const otp = crypto.randomInt(100000, 999999);
@@ -233,6 +229,13 @@ export const verifyOtp = tryCatch(async (req, res) => {
   });
 });
 
+export const myProfile = tryCatch(async (req, res) => {
+  const user = req.user;
+  res.status(200).json(user);
+});
+
+
+
 /**
  ******************* After review this code **********
  * email will be convert to lowercase email.toLowerCase()
@@ -240,7 +243,7 @@ export const verifyOtp = tryCatch(async (req, res) => {
  * Math.random() is not cryptographically secure. Use crypto.randomInt(100000, 999999) instead for OTPs
  * Use crypto.randomInt for OTPs.
  * Consider logging suspicious login attempts.
- * 
+ *
  * OTP comparison: if(storeOtp !== otp) might fail if one is a string and the other is a number. Use String(storeOtp) !== String(otp) to be safe.
- * 
+ *
  */
