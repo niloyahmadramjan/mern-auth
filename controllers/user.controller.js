@@ -7,6 +7,7 @@ import bcrypt from "bcrypt";
 import crypto from "crypto";
 import sendMail from "../config/sendMail.js";
 import { getOtpHtml, getVerifyEmailHtml } from "../config/emailTemplate.js";
+import { generateToken } from "../config/generateToken.js";
 
 export const registerUser = tryCatch(async (req, res) => {
   const sanitizeBody = sanitize(req.body);
@@ -188,3 +189,38 @@ export const loginUser = tryCatch(async (req, res) => {
     message: "If your email is valid, and OTP has been sent. It will be valid for 5 minutes"
   })
 });
+
+
+export const verifyOtp = tryCatch(async(req,res)=>{
+    const {email , otp } = req.body;
+    if(!email || !otp){
+      return res.status(400).json({
+        message: "Please Provide all details"
+      })
+    }
+    const otpKey = `otp:${email}`;
+     const storeOtpString = await redisClient.get(otpKey)
+     if(!storeOtpString){
+      return res.status(400).json({
+        message: "OTP is expired!"
+      })
+     }
+
+     const storeOtp = JSON.parse(storeOtpString);
+
+
+     if(storeOtp !== otp){
+      return res.status(400).json({
+        message: "Invalid OTP"
+      })
+     }
+     await redisClient.del(otpKey)
+     let user = await User.findOne({email}).select('-password');
+
+     const tokenData = await generateToken(user._id, res)
+     res.status(200).json({
+      message: `welcome ${user.email}`,
+      user,
+     })
+    
+})
