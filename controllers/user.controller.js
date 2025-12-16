@@ -78,7 +78,7 @@ export const registerUser = tryCatch(async (req, res) => {
 
   res.status(200).json({
     message:
-      "If your email is valid, a verification like have been sent. It expire is 5 minutes",
+      "If your email is valid, a verification link has been sent. It will expire in 5 minutes.",
   });
 });
 
@@ -161,19 +161,25 @@ export const loginUser = tryCatch(async (req, res) => {
 
   const user = await User.findOne({ email });
   if (!user) {
-    return res.status(400).json({
-      message: "Invalid credentials",
-    });
+    return res
+      .status(400)
+      .json({
+        message: "Invalid credentials",
+        errorCode: "INVALID_CREDENTIALS",
+      });
   }
   const comparePwd = await bcrypt.compare(password, user.password);
 
   if (!comparePwd) {
-    return res.status(400).json({
-      message: "Invalid credentials",
-    });
+    return res
+      .status(400)
+      .json({
+        message: "Invalid credentials",
+        errorCode: "INVALID_CREDENTIALS",
+      });
   }
 
-  const otp = Math.floor(100000 + Math.random() * 900000);
+  const otp = crypto.randomInt(100000, 999999);
 
   const otpKey = `otp:${email}`;
   await redisClient.set(otpKey, JSON.stringify(otp), { EX: 300 });
@@ -186,41 +192,55 @@ export const loginUser = tryCatch(async (req, res) => {
     EX: 60,
   });
   res.json({
-    message: "If your email is valid, and OTP has been sent. It will be valid for 5 minutes"
-  })
+    message:
+      "If your email is valid, a verification link has been sent. It will expire in 5 minutes.",
+  });
 });
 
+export const verifyOtp = tryCatch(async (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || !otp) {
+    return res.status(400).json({
+      message: "Please Provide all details",
+    });
+  }
+  const otpKey = `otp:${email}`;
+  const storeOtpString = await redisClient.get(otpKey);
+  if (!storeOtpString) {
+    return res.status(400).json({
+      message: "OTP is expired!",
+    });
+  }
 
-export const verifyOtp = tryCatch(async(req,res)=>{
-    const {email , otp } = req.body;
-    if(!email || !otp){
-      return res.status(400).json({
-        message: "Please Provide all details"
-      })
-    }
-    const otpKey = `otp:${email}`;
-     const storeOtpString = await redisClient.get(otpKey)
-     if(!storeOtpString){
-      return res.status(400).json({
-        message: "OTP is expired!"
-      })
-     }
+  const storeOtp = JSON.parse(storeOtpString);
 
-     const storeOtp = JSON.parse(storeOtpString);
+  if (String(storeOtp) !== String(otp)) {
+    return res.status(400).json({
+      message: "Invalid OTP",
+    });
+  }
+  await redisClient.del(otpKey);
+  let user = await User.findOne({ email }).select("-password");
 
+  const tokenData = await generateToken(user._id, res);
+  res.status(200).json({
+    message: `welcome ${user.email}`,
+    user: {
+      _id: user._id,
+      email: user.email,
+      name: user.name,
+    },
+  });
+});
 
-     if(storeOtp !== otp){
-      return res.status(400).json({
-        message: "Invalid OTP"
-      })
-     }
-     await redisClient.del(otpKey)
-     let user = await User.findOne({email}).select('-password');
-
-     const tokenData = await generateToken(user._id, res)
-     res.status(200).json({
-      message: `welcome ${user.email}`,
-      user,
-     })
-    
-})
+/**
+ ******************* After review this code **********
+ * email will be convert to lowercase email.toLowerCase()
+ * Force emails to lowercase before storing or checking
+ * Math.random() is not cryptographically secure. Use crypto.randomInt(100000, 999999) instead for OTPs
+ * Use crypto.randomInt for OTPs.
+ * Consider logging suspicious login attempts.
+ * 
+ * OTP comparison: if(storeOtp !== otp) might fail if one is a string and the other is a number. Use String(storeOtp) !== String(otp) to be safe.
+ * 
+ */
