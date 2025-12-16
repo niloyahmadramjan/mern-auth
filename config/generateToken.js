@@ -30,6 +30,7 @@ export const generateToken = async (id, res) => {
   return { accessToken, refreshToken };
 };
 
+
 export const verifyRefreshToken = async (refreshToken) => {
   try {
     const decode = jwt.verify(refreshToken, process.env.REFESH_SECRET);
@@ -43,3 +44,19 @@ export const verifyRefreshToken = async (refreshToken) => {
   }
 };
 
+export const generateAccessToken = async (id, res) => {
+  const accessToken = jwt.sign({ id }, process.env.JWT_SECRET, {
+    expiresIn: process.env.ACCESS_TOKEN_EXP,
+  });
+  res.cookie("accessToken", accessToken, {
+    httpOnly: true,
+    // secure: true,
+    sameSite: "strict",
+    // for 1 min
+    maxAge: 1 * 60 * 1000,
+  });
+};
+
+export const revokeRefreshToken = async(userId)=>{
+  await redisClient.del(`refresh_token:${userId}`)
+}
