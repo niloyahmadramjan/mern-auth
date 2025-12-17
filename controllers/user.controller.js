@@ -10,6 +10,7 @@ import { getOtpHtml, getVerifyEmailHtml } from "../config/emailTemplate.js";
 import {
   generateAccessToken,
   generateToken,
+  revokeRefreshToken,
   verifyRefreshToken,
 } from "../config/generateToken.js";
 
@@ -258,6 +259,21 @@ export const refreshToken = tryCatch(async (req, res) => {
     message: "Token refreshed",
   });
 });
+
+
+export const userLogOut = tryCatch(async(req,res)=>{
+  const userId = req.user._id;
+  await revokeRefreshToken(userId)
+  res.clearCookie("refreshToken")
+  res.clearCookie("accessToken")
+
+  await redisClient.del(`user:${userId}`)
+
+  res.status(200).json({
+    message: "Log out successfully!"
+  })
+
+})
 
 /**
  ******************* After review this code **********

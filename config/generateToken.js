@@ -14,10 +14,10 @@ export const generateToken = async (id, res) => {
 
   res.cookie("accessToken", accessToken, {
     httpOnly: true,
-    // secure: true,
-    sameSite: "strict",
-    // for 1 min
-    maxAge: 1 * 60 * 1000,
+    secure: true,
+    sameSite: "none",
+    // for 15 min
+    maxAge: 15 * 60 * 1000,
   });
 
   res.cookie("refreshToken", refreshToken, {
@@ -29,7 +29,6 @@ export const generateToken = async (id, res) => {
 
   return { accessToken, refreshToken };
 };
-
 
 export const verifyRefreshToken = async (refreshToken) => {
   try {
@@ -57,6 +56,6 @@ export const generateAccessToken = async (id, res) => {
   });
 };
 
-export const revokeRefreshToken = async(userId)=>{
-  await redisClient.del(`refresh_token:${userId}`)
-}
+export const revokeRefreshToken = async (userId) => {
+  await redisClient.del(`refresh_token:${userId}`);
+};
