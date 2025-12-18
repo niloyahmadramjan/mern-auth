@@ -30,10 +30,7 @@ export const verifyCSRFToken = async (req, res, next) => {
       });
     }
 
-    const clientToken =
-      req.headers["x-csrf-token"] ||
-      req.headers["x-xsrf-token"] ||
-      req.headers["csrf-token"];
+    const clientToken = req.headers["x-csrf-token"];
     if (!clientToken) {
       return res.status(403).json({
         message: "CSRF token missing. Please refresh the page",
