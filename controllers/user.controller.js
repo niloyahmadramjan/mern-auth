@@ -13,6 +13,7 @@ import {
   revokeRefreshToken,
   verifyRefreshToken,
 } from "../config/generateToken.js";
+import { generateCSRFToken } from "../config/csrfMiddleware.js";
 
 export const registerUser = tryCatch(async (req, res) => {
   const sanitizeBody = sanitize(req.body);
@@ -179,19 +180,16 @@ export const loginUser = tryCatch(async (req, res) => {
       errorCode: "INVALID_CREDENTIALS",
     });
   }
-
   const otp = crypto.randomInt(100000, 999999);
-
   const otpKey = `otp:${email}`;
   await redisClient.set(otpKey, JSON.stringify(otp), { EX: 300 });
-
   const subject = "OTP for verification";
   const html = getOtpHtml({ email, otp });
   await sendMail({ email, subject, html });
-
   await redisClient.set(rateLimitKey, "true", {
     EX: 60,
   });
+
   res.json({
     message:
       "If your email is valid, a verification link has been sent. It will expire in 5 minutes.",
@@ -260,20 +258,28 @@ export const refreshToken = tryCatch(async (req, res) => {
   });
 });
 
-
-export const userLogOut = tryCatch(async(req,res)=>{
+export const userLogOut = tryCatch(async (req, res) => {
   const userId = req.user._id;
-  await revokeRefreshToken(userId)
-  res.clearCookie("refreshToken")
-  res.clearCookie("accessToken")
+  await revokeRefreshToken(userId);
+  res.clearCookie("refreshToken");
+  res.clearCookie("accessToken");
+  res.clearCookie("csrfToken");
 
-  await redisClient.del(`user:${userId}`)
+  await redisClient.del(`user:${userId}`);
 
   res.status(200).json({
-    message: "Log out successfully!"
-  })
+    message: "Log out successfully!",
+  });
+});
 
-})
+export const refreshCSRF = tryCatch(async (req, res) => {
+  const userId = req.user._id;
+  const newCSFToken = await generateCSRFToken(userId, res);
+  res.json({
+    message: "CSRF token refreshed successfully!",
+    csrfToken: newCSFToken,
+  });
+});
 
 /**
  ******************* After review this code **********

@@ -10,14 +10,24 @@ export const isAuth = async (req, res, next) => {
         message: "Please Login - no token!",
       });
     }
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (!decoded) {
-      return res.status(400).json({
-        message: "Token expired!",
+    // const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // if (!decoded) {
+    //   return res.status(400).json({
+    //     message: "Token expired!",
+    //   });
+    // }
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(401).json({
+        message: err.message, // "jwt expired"
+        code: "JWT_EXPIRED",
       });
     }
 
-    const cacheUser = await redisClient.get(`user:${decode.id}`);
+    const cacheUser = await redisClient.get(`user:${decoded.id}`);
+
     if (cacheUser) {
       req.user = JSON.parse(cacheUser);
       return next();
