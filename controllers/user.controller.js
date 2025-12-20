@@ -13,7 +13,10 @@ import {
   revokeRefreshToken,
   verifyRefreshToken,
 } from "../config/generateToken.js";
-import { generateCSRFToken } from "../config/csrfMiddleware.js";
+import {
+  generateCSRFToken,
+  revokeCSRFTOKEN,
+} from "../config/csrfMiddleware.js";
 
 export const registerUser = tryCatch(async (req, res) => {
   const sanitizeBody = sanitize(req.body);
@@ -182,13 +185,12 @@ export const loginUser = tryCatch(async (req, res) => {
   }
   const otp = crypto.randomInt(100000, 999999);
   const otpKey = `otp:${email}`;
-  await redisClient.set(otpKey, JSON.stringify(otp), { EX: 300 });
+  await redisClient.setEx(otpKey, 300, JSON.stringify(otp));
+
   const subject = "OTP for verification";
   const html = getOtpHtml({ email, otp });
   await sendMail({ email, subject, html });
-  await redisClient.set(rateLimitKey, "true", {
-    EX: 60,
-  });
+  await redisClient.setEx(rateLimitKey, 60, "true");
 
   res.json({
     message:
@@ -210,20 +212,26 @@ export const verifyOtp = tryCatch(async (req, res) => {
       message: "OTP is expired!",
     });
   }
-
-  const storeOtp = JSON.parse(storeOtpString);
-
-  if (String(storeOtp) !== String(otp)) {
+  if (storeOtpString !== String(otp)) {
     return res.status(400).json({
       message: "Invalid OTP",
     });
   }
   await redisClient.del(otpKey);
   let user = await User.findOne({ email }).select("-password");
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
+  }
 
-  const tokenData = await generateToken(user._id, res);
+  const tokenData = await generateToken(user._id,req, res);
+
   res.status(200).json({
     message: `welcome ${user.email}`,
+    sessionInfo: {
+      sessionId: tokenData.sessionId,
+      loginTime: new Date().toISOString(),
+      csrfToken: tokenData.csrfToken,
+    },
     user: {
       _id: user._id,
       email: user.email,
@@ -234,12 +242,25 @@ export const verifyOtp = tryCatch(async (req, res) => {
 
 export const myProfile = tryCatch(async (req, res) => {
   const user = req.user;
-  res.status(200).json(user);
+  const sessionId = req.sessionId;
+  const sessionData = await redisClient.get(`session:${sessionId}`);
+  let sessionInfo = null;
+
+  if (sessionData) {
+    const parseSession = JSON.parse(sessionData);
+    sessionInfo = {
+      sessionId,
+      ip,
+      userAgent,
+      loginTime: parseSession.createdAt,
+      lastActivity: parseSession.lastActivity,
+    };
+  }
+  res.status(200).json({ user, sessionInfo });
 });
 
 export const refreshToken = tryCatch(async (req, res) => {
   const refreshToken = req.cookies.refreshToken;
-  console.log("Cookies:", req.cookies);
 
   if (!refreshToken) {
     return res.status(401).json({
@@ -248,11 +269,15 @@ export const refreshToken = tryCatch(async (req, res) => {
   }
   const decode = await verifyRefreshToken(refreshToken);
   if (!decode) {
+    res.clearCookie("refreshToken");
+    res.clearCookie("accessToken");
+    res.clearCookie("csrfToken");
+
     return res.status(401).json({
-      message: "Invalid refresh token!",
+      message: "Session Expired. Please login.",
     });
   }
-  generateAccessToken(decode.id, res);
+  generateAccessToken(decode.id, decode.sessionId, res);
   res.status(200).json({
     message: "Token refreshed",
   });
@@ -261,6 +286,7 @@ export const refreshToken = tryCatch(async (req, res) => {
 export const userLogOut = tryCatch(async (req, res) => {
   const userId = req.user._id;
   await revokeRefreshToken(userId);
+  await revokeCSRFTOKEN(userId);
   res.clearCookie("refreshToken");
   res.clearCookie("accessToken");
   res.clearCookie("csrfToken");
@@ -278,6 +304,12 @@ export const refreshCSRF = tryCatch(async (req, res) => {
   res.json({
     message: "CSRF token refreshed successfully!",
     csrfToken: newCSFToken,
+  });
+});
+
+export const adminController = tryCatch(async (req, res) => {
+  res.json({
+    message: "Hello admin",
   });
 });
 
